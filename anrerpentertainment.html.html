@@ -2230,6 +2230,57 @@ function handleCredentialResponse(response) {
 
 <!-- Add this button anywhere on your page -->
 <button id="google-login-btn"></button>
+  <!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore-compat.js"></script>
+
+<script>
+// ================== YOUR FIREBASE CONFIG ==================
+const firebaseConfig = {
+  apiKey: "AIzaSyDGeBbC0K-ArFYWN9pjatglPi3b71G02EI",
+  authDomain: "anrerp-39f2b.firebaseapp.com",
+  projectId: "anrerp-39f2b",
+  storageBucket: "anrerp-39f2b.firebasestorage.app",
+  messagingSenderId: "970164315576",
+  appId: "1:970164315576:web:b8e62a954aadd449f3db4d",
+  measurementId: "G-LEHBPM6949"
+};
+  
+// Initialize Firebase
+const app = firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+// ========================================================
+
+// Google Sign-In Button
+document.getElementById('google-login-btn').addEventListener('click', () => {
+  const provider = new firebase.auth.GoogleAuthProvider();
+
+  auth.signInWithPopup(provider)
+    .then((result) => {
+      const user = result.user;
+      console.log("User signed in:", user);
+
+      // Save user data to Firestore
+      db.collection("users").doc(user.uid).set({
+        name: user.displayName,
+        email: user.email,
+        photo: user.photoURL,
+        lastLogin: new Date(),
+        // You can add ticket/combo data here later
+      }, { merge: true });
+
+      alert("Welcome " + user.displayName + "!");
+      // Redirect or show logged-in UI
+      window.location.href = "dashboard.html";   // or your success page
+    })
+    .catch((error) => {
+      console.error(error);
+      alert("Sign-in failed: " + error.message);
+    });
+});
+</script>
 
 </script>
 </body>
