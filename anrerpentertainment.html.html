@@ -2180,67 +2180,56 @@ function startCashfreePayment() {
 // Setup: console.cloud.google.com → APIs & Services → Credentials → OAuth 2.0 Client ID
 // Paste your client ID below, then add your domain to Authorised JavaScript origins
 
-function handleOAuth(provider) {
-  if (provider === 'google') {
-    var CLIENT_ID = '980454088258-ekbh2m2eprpdbbtmtjq7u2clbkfu86ve.apps.googleusercontent.com';
-    if (CLIENT_ID.indexOf('YOUR_') === 0) {
-      showToast('\u2139\uFE0F', 'Add your Google Client ID to enable this.');
-      return;
-    }
-    var redirect = window.location.href.split('#')[0].split('?')[0];
-    var state    = btoa(JSON.stringify({ page: preAuthPage, ts: Date.now() }));
-    sessionStorage.setItem('oauth_state', state);
-    window.location.href =
-      'https://accounts.google.com/o/oauth2/v2/auth'
-      + '?client_id='    + CLIENT_ID
-      + '&redirect_uri=' + encodeURIComponent(redirect)
-      + '&response_type=token%20id_token'
-      + '&scope='        + encodeURIComponent('openid email profile')
-      + '&nonce='        + Math.random().toString(36).slice(2)
-      + '&state='        + encodeURIComponent(state);
-    return;
-  }
-  showToast('\u2139\uFE0F', 'Microsoft sign-in coming soon!');
-}
+<!-- Google Identity Services (Latest) -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 
-(function handleGoogleCallback() {
-  var hash = window.location.hash;
-  if (!hash || hash.indexOf('id_token') === -1) return;
-  var params = {};
-  hash.replace(/^#/, '').split('&').forEach(function(p) {
-    var kv = p.split('=');
-    params[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1] || '');
+<script>
+// Replace with YOUR actual Client ID
+const GOOGLE_CLIENT_ID = "980454088258-ekbh2m2eprpdbbtmtjq7u2clbkfu86ve.apps.googleusercontent.com";   // ← Paste your Client ID here
+
+window.onload = function () {
+  google.accounts.id.initialize({
+    client_id: GOOGLE_CLIENT_ID,
+    callback: handleCredentialResponse,
+    auto_select: false,
+    cancel_on_tap_outside: true
   });
-  if (!params.id_token) return;
-  try {
-    var b64 = params.id_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-    while (b64.length % 4) b64 += '=';
-    var payload    = JSON.parse(atob(b64));
-    var returnPage = 'home';
-    try { returnPage = JSON.parse(atob(params.state || '')).page || 'home'; } catch(e) {}
-    currentUser = {
-      name:     payload.name  || payload.email.split('@')[0],
-      email:    payload.email || '',
-      phone:    '',
-      avatar:   payload.picture || null,
-      joined:   new Date().toISOString(),
-      googleId: payload.sub
-    };
-    localStorage.setItem('anrerp_user', JSON.stringify(currentUser));
-    var regs = JSON.parse(localStorage.getItem('anrerp_registrations') || '[]');
-    if (!regs.some(function(r) { return r.email === currentUser.email; })) {
-      regs.push({ email: currentUser.email, name: currentUser.name, joined: currentUser.joined, source: 'google' });
+
+  // Render the Sign In button
+  google.accounts.id.renderButton(
+    document.getElementById("google-login-btn"),
+    {
+      theme: "outline",     // or "filled_blue"
+      size: "large",
+      text: "signin_with",
+      shape: "rectangular",
+      logo_alignment: "left"
     }
-    localStorage.setItem('anrerp_registrations', JSON.stringify(regs));
-    history.replaceState(null, '', window.location.pathname);
-    updateProfileUI();
-    showToast('\u2705', 'Welcome, ' + currentUser.name + '!');
-    preAuthPage = returnPage;
-    setTimeout(function() { showPage(returnPage); }, 500);
-  } catch(e) {
-    console.error('Google sign-in error:', e);
-  }
-})();
+  );
+};
+
+function handleCredentialResponse(response) {
+  console.log("Encoded JWT ID token: " + response.credential);
+
+  // Decode the token to get user info
+  const data = JSON.parse(atob(response.credential.split('.')[1]));
+  
+  console.log("User Info:", {
+    name: data.name,
+    email: data.email,
+    picture: data.picture
+  });
+
+  // Save user data (you can send to your backend or Firestore later)
+  alert("Welcome " + data.name + "!\nEmail: " + data.email);
+
+  // Redirect after successful login
+  // window.location.href = "dashboard.html";
+}
+</script>
+
+<!-- Add this button anywhere on your page -->
+<button id="google-login-btn"></button>
 
 </script>
 </body>
