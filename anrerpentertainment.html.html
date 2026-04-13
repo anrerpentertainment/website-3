@@ -2051,7 +2051,9 @@ function closeBookingSuccess(){
   document.getElementById('psoOverlay').classList.remove('show');
   showPage('home');
 }
-
+<button onclick="startRazorpayPayment()" style="width:100%;background:var(--red);color:#fff;border:none;padding:17px;font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:3px;border-radius:10px;cursor:pointer;">
+  PAY NOW WITH RAZORPAY
+</button>
 // ── INIT ─────────────────────────────────────────────────────────────────────
 renderShows();
 renderFood();
@@ -2112,7 +2114,9 @@ function signInWithGoogle() {
         photoURL: user.photoURL,
         joined: new Date().toISOString()
       };
-
+<button onclick="signInWithGoogle()" style="background:#4285F4;color:white;padding:12px 24px;border:none;border-radius:8px;font-size:16px;cursor:pointer;width:100%;margin-top:10px;">
+  Sign in with Google
+</button>
       // Save user data to Firestore
       db.collection("users").doc(user.uid).set({
         name: user.displayName,
@@ -2178,7 +2182,7 @@ const firebaseConfig = {
   appId: "1:970164315576:web:b8e62a954aadd449f3db4d",
   measurementId: "G-LEHBPM6949"
 };
-
+const GOOGLE_CLIENT_ID = "970164315576-h456gto4nq9e15a3170pem9pi1iu6cn8.apps.googleusercontent.com",
 const app = firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
