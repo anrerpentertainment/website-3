@@ -1741,22 +1741,29 @@ window.logout = async function() {
   }
 };
 
-// ── REWRITTEN BOOKING SUCCESS FUNCTION ────────────────────────────────────────
+// ── REWRITTEN BOOKING SUCCESS FUNCTION (ROOT COLLECTION VERSION) ──────────────
 window.showBookingSuccess = async function(name, email, phone) {
+  // 1. Calculate totals
   const subTotal = cart.reduce((total, currentItem) => total + currentItem.price * currentItem.qty, 0);
-  const totalAmount = subTotal + Math.round(subTotal * 0.02);
+  const totalAmount = subTotal + Math.round(subTotal * 0.02); // 2% convenience fee
+  
+  // 2. Generate Reference and Metadata
   const bookingRef = 'ANR-' + Date.now().toString(36).toUpperCase().slice(-8);
   const currentDate = new Date();
   const dateString = currentDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
   const timeString = currentDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
   const totalItems = cart.reduce((total, currentItem) => total + currentItem.qty, 0);
 
+  // 3. UI Update Helpers
   const setText = (id, val) => { 
     const elementNode = document.getElementById(id); 
     if (elementNode) elementNode.textContent = val; 
   };
   
-  document.getElementById('psoRef').innerHTML = 'Booking Reference<br><span>' + bookingRef + '</span>';
+  // Update Success Modal UI
+  const refEl = document.getElementById('psoRef');
+  if (refEl) refEl.innerHTML = 'Booking Reference<br><span>' + bookingRef + '</span>';
+  
   setText('psoName', name);
   setText('psoEmail', email);
   setText('psoPhone', phone || 'Not provided');
@@ -1764,17 +1771,20 @@ window.showBookingSuccess = async function(name, email, phone) {
   setText('psoDate', dateString + ' at ' + timeString);
   setText('psoItems', totalItems + ' item(s)');
 
+  // 4. Prepare the Data Object
   const orderData = {
     ref: bookingRef,
-    name: name,
-    email: email,
-    phone: phone,
+    userName: name,
+    userEmail: email,
+    userPhone: phone,
+    userId: (window.currentUser && window.currentUser.uid) ? window.currentUser.uid : 'GUEST',
     amount: totalAmount,
-    date: currentDate.toISOString(),
-    items: JSON.parse(JSON.stringify(cart))
+    status: 'COMPLETED', // Good for future filtering
+    createdAt: currentDate.toISOString(),
+    items: JSON.parse(JSON.stringify(cart)) // Deep copy of the cart
   };
 
-  // Save to local storage (existing logic)
+  // 5. Save to Local Storage (Fallback/Quick Access)
   try {
     const bookingsList = JSON.parse(localStorage.getItem('anrerp_bookings') || '[]');
     bookingsList.push(orderData);
@@ -1783,20 +1793,20 @@ window.showBookingSuccess = async function(name, email, phone) {
     console.error("Local storage error:", storageError);
   }
 
-  // Save to Firestore Database
-  if (window.currentUser && window.currentUser.uid) {
-    try {
-      const ordersRef = collection(db, "users", window.currentUser.uid, "orders");
-      await addDoc(ordersRef, orderData);
-      console.log("Order securely saved to Firebase!");
-    } catch (dbError) {
-      console.error("Error saving order to Firestore:", dbError);
-    }
+  // 6. Save to Firestore (NEW ROOT-LEVEL IMPLEMENTATION)
+  try {
+    // We now point directly to the top-level "orders" collection
+    const globalOrdersRef = collection(db, "orders");
+    await addDoc(globalOrdersRef, orderData);
+    console.log("Order successfully saved to Global Database!");
+  } catch (dbError) {
+    console.error("Error saving order to Global Firestore:", dbError);
+    // Optional: showToast('⚠️', 'Order saved locally, but cloud sync failed.');
   }
 
+  // 7. Show Modal and Reset Cart
   document.getElementById('psoOverlay').classList.add('show');
   
-  // Clear cart
   window.cart = []; 
   if (typeof updateCart === 'function') updateCart();
 };
