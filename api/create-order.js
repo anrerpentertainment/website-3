@@ -49,7 +49,7 @@ module.exports = async (req, res) => {
         });
 
         const options = {
-            hostname: 'api.cashfree.com',
+            hostname: 'sandbox.cashfree.com',
             path: '/pg/orders',
             method: 'POST',
             headers: {
