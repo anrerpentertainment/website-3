@@ -1563,6 +1563,7 @@ footer{background:var(--black3);border-top:1px solid rgba(232,17,45,.14);padding
 <div class="cart-overlay" id="cartOverlay" onclick="toggleCart()"></div><div class="cart-panel" id="cartPanel"><div class="cart-head"><div class="cart-title">Your Cart</div><button class="cart-close" onclick="toggleCart()">&#10005;</button></div><div class="cart-items" id="cartItems"><div class="cart-empty"><div class="cart-empty-icon">&#128722;</div><p>Your cart is empty</p></div></div><div class="cart-foot"><div class="cart-total-row"><span class="cart-total-lbl">Total</span><span class="cart-total-amt" id="cartTotal">&#8377;0</span></div><button class="cart-co-btn" onclick="checkout()">Proceed to Checkout &#8594;</button></div></div>
 //Handles Firebase
 <script type="module">  
+
 // ── FIREBASE SETUP ────────────────────────────────────────────────────────────
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { 
@@ -1741,74 +1742,20 @@ window.logout = async function() {
   }
 };
 
-// ── REWRITTEN BOOKING SUCCESS FUNCTION (ROOT COLLECTION VERSION) ──────────────
-window.showBookingSuccess = async function(name, email, phone) {
-  // 1. Calculate totals
-  const subTotal = cart.reduce((total, currentItem) => total + currentItem.price * currentItem.qty, 0);
-  const totalAmount = subTotal + Math.round(subTotal * 0.02); // 2% convenience fee
-  
-  // 2. Generate Reference and Metadata
-  const bookingRef = 'ANR-' + Date.now().toString(36).toUpperCase().slice(-8);
-  const currentDate = new Date();
-  const dateString = currentDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-  const timeString = currentDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-  const totalItems = cart.reduce((total, currentItem) => total + currentItem.qty, 0);
-
-  // 3. UI Update Helpers
-  const setText = (id, val) => { 
-    const elementNode = document.getElementById(id); 
-    if (elementNode) elementNode.textContent = val; 
-  };
-  
-  // Update Success Modal UI
-  const refEl = document.getElementById('psoRef');
-  if (refEl) refEl.innerHTML = 'Booking Reference<br><span>' + bookingRef + '</span>';
-  
-  setText('psoName', name);
-  setText('psoEmail', email);
-  setText('psoPhone', phone || 'Not provided');
-  setText('psoAmt', '₹' + totalAmount.toLocaleString('en-IN'));
-  setText('psoDate', dateString + ' at ' + timeString);
-  setText('psoItems', totalItems + ' item(s)');
-
-  // 4. Prepare the Data Object
-  const orderData = {
-    ref: bookingRef,
-    userName: name,
-    userEmail: email,
-    userPhone: phone,
-    userId: (window.currentUser && window.currentUser.uid) ? window.currentUser.uid : 'GUEST',
-    amount: totalAmount,
-    status: 'COMPLETED', // Good for future filtering
-    createdAt: currentDate.toISOString(),
-    items: JSON.parse(JSON.stringify(cart)) // Deep copy of the cart
-  };
-
-  // 5. Save to Local Storage (Fallback/Quick Access)
-  try {
-    const bookingsList = JSON.parse(localStorage.getItem('anrerp_bookings') || '[]');
-    bookingsList.push(orderData);
-    localStorage.setItem('anrerp_bookings', JSON.stringify(bookingsList));
-  } catch (storageError) {
-    console.error("Local storage error:", storageError);
-  }
-
-  // 6. Save to Firestore (NEW ROOT-LEVEL IMPLEMENTATION)
-  try {
-    // We now point directly to the top-level "orders" collection
-    const globalOrdersRef = collection(db, "orders");
-    await addDoc(globalOrdersRef, orderData);
-    console.log("Order successfully saved to Global Database!");
-  } catch (dbError) {
-    console.error("Error saving order to Global Firestore:", dbError);
-    // Optional: showToast('⚠️', 'Order saved locally, but cloud sync failed.');
-  }
-
-  // 7. Show Modal and Reset Cart
-  document.getElementById('psoOverlay').classList.add('show');
-  
-  window.cart = []; 
-  if (typeof updateCart === 'function') updateCart();
+// ── REWRITTEN BOOKING SUCCESS FUNCTION (SECURE VERSION) ──────────────
+window.showBookingSuccess = function(name, email, phone) {
+    const subTotal = cart.reduce((total, currentItem) => total + currentItem.price * currentItem.qty, 0);
+    const totalAmount = subTotal + Math.round(subTotal * 0.02);
+    
+    document.getElementById('psoRef').innerHTML = 'Booking Reference<br><span style="color: #34A853;">Check Email for details</span>';
+    document.getElementById('psoName').textContent = name;
+    document.getElementById('psoEmail').textContent = email;
+    document.getElementById('psoAmt').textContent = '₹' + totalAmount.toLocaleString('en-IN');
+    
+    // Show Modal and Reset Cart
+    document.getElementById('psoOverlay').classList.add('show');
+    window.cart = []; 
+    if (typeof updateCart === 'function') updateCart();
 };
 </script>>
 //Website JS
@@ -2210,20 +2157,80 @@ function handleQRUpload(input){
   };
   reader.readAsDataURL(file);
 }
-function processPayment(){
-  var name=(document.getElementById('payerName')||{value:''}).value.trim();
-  var email=(document.getElementById('payerEmail')||{value:''}).value.trim();
-  var phone=(document.getElementById('payerPhone')||{value:''}).value.trim();
-  if(!name||!email||!phone){showToast('\u26A0\uFE0F','Please fill in all your details.');return;}
-  var btn=document.getElementById('payGoBtn'); if(!btn) return;
-  btn.disabled=true;
-  btn.innerHTML='<span style="display:inline-block;animation:spin .7s linear infinite">\u21BB</span>&nbsp; PROCESSING...';
-  setTimeout(function(){
-    btn.disabled=false;
-    btn.innerHTML='PAY NOW &nbsp;\u2022&nbsp; <span id="payBtnAmt"></span>';
-    renderPaymentPage(); showBookingSuccess(name,email,phone);
-  },2000);
-}
+
+const cashfree = Cashfree({
+    mode: "sandbox" 
+});
+
+window.processPayment = async function() {
+    var name = (document.getElementById('payerName')||{value:''}).value.trim();
+    var email = (document.getElementById('payerEmail')||{value:''}).value.trim();
+    var phone = (document.getElementById('payerPhone')||{value:''}).value.trim();
+
+    // 1. Validate inputs
+    if(!name || !email || !phone){
+        if (typeof showToast === 'function') showToast('⚠️', 'Please fill in all your details.');
+        return;
+    }
+
+    var btn = document.getElementById('payGoBtn'); 
+    if(!btn) return;
+
+    // 2. Calculate totals dynamically from the cart array
+    var sub = cart.reduce(function(s,c){return s+c.price*c.qty;},0);
+    var fee = Math.round(sub*0.02);
+    var tot = sub + fee;
+
+    // 3. Set visual loading state
+    btn.disabled = true;
+    btn.innerHTML = '<span style="display:inline-block;animation:spin .7s linear infinite">↻</span>&nbsp; INITIATING...';
+
+    try {
+        // 4. Call your Vercel backend to get the Cashfree session ID and save the PENDING order
+        const response = await fetch('/api/create-order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                amount: tot,
+                customerName: name,
+                customerEmail: email,
+                customerPhone: phone,
+                cartItems: cart, // Passing the cart to the backend
+                userId: (window.currentUser && window.currentUser.uid) ? window.currentUser.uid : 'GUEST'
+            })
+        });
+
+        const orderData = await response.json();
+
+        if (orderData.payment_session_id) {
+            // 5. Launch the Cashfree Checkout Modal
+            cashfree.checkout({
+                paymentSessionId: orderData.payment_session_id,
+                redirectTarget: "_modal" 
+            }).then((result) => {
+                if(result.error){
+                    // Payment failed or user closed the modal
+                    if (typeof showToast === 'function') showToast('⚠️', result.error.message || 'Payment failed or cancelled.');
+                    btn.disabled = false;
+                    btn.innerHTML = 'PAY NOW &nbsp;&bull;&nbsp; <span>₹' + tot.toLocaleString('en-IN') + '</span>';
+                }
+                if(result.paymentDetails){
+                    // 6. PAYMENT SUCCESS! Trigger confirmation popup (backend handles DB via webhook)
+                    btn.innerHTML = 'PAYMENT SUCCESSFUL!';
+                    window.showBookingSuccess(name, email, phone); 
+                }
+            });
+        } else {
+            throw new Error('Failed to create payment session');
+        }
+
+    } catch (error) {
+        console.error("Checkout Error:", error);
+        if (typeof showToast === 'function') showToast('⚠️', 'Error initiating payment. Please try again.');
+        btn.disabled = false;
+        btn.innerHTML = 'PAY NOW &nbsp;&bull;&nbsp; <span>₹' + tot.toLocaleString('en-IN') + '</span>';
+    }
+};
 function closeBookingSuccess(){
   document.getElementById('psoOverlay').classList.remove('show');
   showPage('home');
